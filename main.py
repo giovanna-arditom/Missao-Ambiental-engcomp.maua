@@ -1,0 +1,84 @@
+
+#IMPORT BIBLIOTECAS
+import pandas as pd
+import streamlit as st
+import numpy 
+import plotly.express as px
+import math
+
+
+#CONFIGURANDO TELA INICIAL
+st.set_page_config(page_title="Missão Ambiental", layout="wide") #setando a aba superior
+st.title("Estação missão ambiental - Anélise de dados") #título da página
+
+
+#PUXANDO DADOS CSV
+df = pd.read_csv('monitoramento_microclima_sintetico.csv', parse_dates=['timestamp']) #atribuindo minha ta
+
+st.subheader("Primeiras linhas")
+st.dataframe(df.head()) #visualização das primeiras 5 linhas
+
+st.subheader("Informações gerais")
+st.write(f'Linhas: {df.shape[0]} | Colunas: {df.shape[1]}') #verificando a quantidade de linhas e colunas do dataframe
+st.write(df.dtypes) #verificando os tipode de daddos das colunas
+
+
+#LIMPEZA DOS DADOS (NaN e Outliers)
+st.subheader("Valores faltantes (NaN)")
+
+nans = df.isna().sum() #conta quantos valores são NaN
+st.dataframe(nans[nans > 0]) #mostra só as colunas que tam ao menos 1 valor faltando
+
+
+#Aqui temos que tomar uma decisão do que fazer com esses valores
+#No contexto atual, vamos preencher com a mediana
+df['mp25_ugm3'] = df["mp25_ugm3"].fillna(df["mp25_ugm3"].median()) #preencher os valores da coluna mp25_ugm3 com a mediana
+
+#tratemento de outliers
+def detectar_outliers_iqr(coluna):
+    q1 = df[coluna].quantile(0.25) #valoers abaixo dos 25% dos dados
+    q3 = df[coluna].quantile(0.75) #valoers acima dos 25% dos dados
+    iqr = q3 - q1
+    limite_inf = q1 - 1.5 * iqr #abaixo disso o valor é considerado outlier para baixo
+    limite_sup = q3 + 1.5 * iqr #acima disso o valor é considerado outlier para cima
+    return df[(df[coluna] < limite_inf) | (df[coluna] > limite_sup)] #retorno da minha função no meio dos quartis
+
+st.subheader("Outliers em MP2.5")
+outliers = detectar_outliers_iqr('mp25_ugm3') #executando a função para a coluna mp25
+st.dataframe(outliers[['timestamp', 'mp25_ugm3']]) #exibindo os valores de outliers em tabela
+
+
+#ESTATÍSTICA DESCRITIVA
+valores = df['temperatura_c'].dropna().tolist() #remove os valores vazios e tranforma nuqma lista
+
+media_manual = sum(valores) / len(valores) #calculo manual da média
+
+st.subheader("Valor da média calculado na mão")
+st.write(f'Valor da média calculado na mão: {media_manual:.2f}') #exibe o valor da média manual com 2 casas decimais
+
+st.subheader('Valores estatísticos feitos no pandas')
+st.dataframe(df.describe().round(2)) #exibo todas as variáveis estatísticas com 2 casas decimais 
+
+
+#PADRÕES NO TEMPO
+df['hora'] = df['timestamp'].dt.hour #pegando valor e hora e colocando na coluna nova
+df['dia_util'] = df['timestamp'].dt.dayofweek < 5 #pegandoos dias da semana na coluna nova
+
+st.subheader('Padrão por hora do dia (Mp2.5)')
+media_hora = df.groupby('hora')['mp25_ugm3'].mean() #media dos valores mp25 por hora
+st.bar_chart(media_hora)
+
+st.subheader('Dia util x fim de semana (Mp2.5)')
+media_tipo_dia = df.groupby('dia_util')['mp25_ugm3'].mean() #media dos valores mp25 por dia da semana e fim de semana
+st.bar_chart(media_tipo_dia)
+
+
+#CORRELAÇÃO
+st.subheader('Correlação')
+colunas_numericas = ['temperatura_c', 'umidade_relativa_pct', 'mp25_ugm3', 'mp10_ugm3',
+                     'co_ppm', 'co2_ppm'] #colunas utilizadas na correlação
+
+corr = df[colunas_numericas].corr() #correlação das colunas definidas anteriormente
+
+fig = px.imshow(corr, text_auto='.2f', color_continuous_scale='RdBu_r', zmin=-1, zmax=1) #criação do gráfico de correlação
+st.plotly_chart(fig, use_container_width='True') #exibição do gráfico de correlação
