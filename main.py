@@ -6,10 +6,12 @@ import numpy
 import plotly.express as px
 import math
 
+#(Comando para rodar streamlit: python -m streamlit run main.py)
+
 
 #CONFIGURANDO TELA INICIAL
 st.set_page_config(page_title="Missão Ambiental", layout="wide") #setando a aba superior
-st.title("Estação missão ambiental - Anélise de dados") #título da página
+st.title("Estação missão ambiental - Análise de dados") #título da página
 
 
 #PUXANDO DADOS CSV
